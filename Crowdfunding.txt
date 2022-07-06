@@ -12,16 +12,17 @@ contract CrowdFunding {
     uint public minContr;
 // manager can not take ether from the contract until people vote and allow him to access the contract
 
-    constructor (uint _target,uint _deadline) public {
+    constructor (uint _target,uint _deadline,uint min_contri) public {
         target=_target;
         deadline=block.timestamp+_deadline;
         manager=msg.sender;
-        minContr=100 wei;
+        minContr=min_contri;
     }
   struct requestAccess {
       string description; //desc abt why we are calculating money
       address payable recipient; //address of recipient
       uint value; //value required to be paid
+      uint grade;
       bool completed;
       uint votersCount;//No of participants who voted for the contract to happen
       mapping(address=>bool)voter;
@@ -65,7 +66,8 @@ contract CrowdFunding {
         _;
     }
 
-    function createRequest(string memory name, address payable recipient,uint val) public onlyManager {
+    function createRequest(string memory name, address payable recipient,uint val,uint grade) public onlyManager {
+       require(grade>7);
        requestAccess storage newReq=requests[numReq];
        numReq++;
        newReq.description=name;
@@ -75,6 +77,21 @@ contract CrowdFunding {
        newReq.votersCount=0;
     }
 
+    function random() public view returns(uint256) {
+        return uint(keccak256(abi.encodePacked(block.difficulty,block.timestamp,numReq)));
+    }
+// selecting a student from eligible student on lottery basis.
+   uint ind;
+    function selectReceiver() public {
+       uint r=random();
+       ind=r%numReq; 
+    }
+
+    
+    function showWinner() public view returns(uint) {
+        return ind;
+    }
+    
     // now we have to do voting for a request
     function voteRequest(uint reqNum) public {
         require(contributions[msg.sender]!=0,"You must contribute to vote");
@@ -84,15 +101,13 @@ contract CrowdFunding {
         thisReq.votersCount++;
     }
 
-    function makePaymet(uint reqNum) public onlyManager {
+    function makePaymet() public onlyManager {
         require(raisedVal>target);
-        requestAccess storage thisReq=requests[reqNum];
+        requestAccess storage thisReq=requests[ind];
         require(thisReq.completed==false,"the request has already been completed");
         require(thisReq.votersCount>contributorsCount/2,"Majority does not support your transaction");
         thisReq.recipient.transfer(thisReq.value);
         raisedVal-=thisReq.value;
         thisReq.completed=true;
-
-
     }
 }
